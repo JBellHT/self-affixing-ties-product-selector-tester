@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self-Affixing Ties Selector</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: center; }
+        th { background-color: #f4f4f4; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        select, input[type="radio"], input[type="number"] { margin: 5px; padding: 5px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Self-Affixing Ties Selector</h1>
+
+    <div id="filters">
+        <!-- Mounting Need Dropdown -->
+        <select id="mountingNeed">
+            <option value="">Select Mounting Need</option>
+        </select>
+
+        <!-- Measurement System Radio Buttons -->
+        <div>
+            <label>
+                <input type="radio" name="measurementSystem" value="Imperial" checked> Imperial
+            </label>
+            <label>
+                <input type="radio" name="measurementSystem" value="Metric"> Metric
+            </label>
+        </div>
+
+        <!-- Mounting Hole Shape Radio Buttons -->
+        <div id="mountingHoleShapeFilters">
+            <label>
+                <input type="radio" name="mountingHoleShape" value="Round" checked> Round Hole Shape
+            </label>
+            <label>
+                <input type="radio" name="mountingHoleShape" value="Oval"> Oval Hole Shape
+            </label>
+        </div>
+
+        <div id="additionalFilters" class="hidden">
+            <!-- Bundle Size moved to the end -->
+
+            <label for="mountingholediameterimperialInput" id="mountingholediameterimperialLabel" class="hidden">Mounting Hole Diameter (Imperial):</label>
+            <input type="text" id="mountingholediameterimperialInput" placeholder="Enter Mounting Hole Diameter" class="hidden">
+
+            <label for="mountingholediametermetricInput" id="mountingholediametermetricLabel" class="hidden">Mounting Hole Diameter (Metric):</label>
+            <input type="text" id="mountingholediametermetricInput" placeholder="Enter Mounting Hole Diameter" class="hidden">
+
+            <label for="panelthicknessimperialInput" id="panelthicknessimperialLabel" class="hidden">Panel Thickness (Imperial):</label>
+            <input type="text" id="panelthicknessimperialInput" placeholder="Enter Panel Thickness" class="hidden">
+
+            <label for="panelthicknessmetricInput" id="panelthicknessmetricLabel" class="hidden">Panel Thickness (Metric):</label>
+            <input type="text" id="panelthicknessmetricInput" placeholder="Enter Panel Thickness" class="hidden">
+
+            <label for="studdiameterimperialInput" id="studdiameterimperialLabel" class="hidden">Stud Diameter (Imperial):</label>
+            <input type="text" id="studdiameterimperialInput" placeholder="Enter Stud Diameter" class="hidden">
+
+            <label for="studdiametermetricInput" id="studdiametermetricLabel" class="hidden">Stud Diameter (Metric):</label>
+            <input type="text" id="studdiametermetricInput" placeholder="Enter Stud Diameter" class="hidden">
+
+            <!-- Bundle Size at the end -->
+            <label for="bundlesizeimperialInput" id="bundlesizeimperialLabel" class="hidden">Bundle Size (Imperial):</label>
+            <input type="text" id="bundlesizeimperialInput" placeholder="Enter Bundle Size" class="hidden">
+
+            <label for="bundlesizemetricInput" id="bundlesizemetricLabel" class="hidden">Bundle Size (Metric):</label>
+            <input type="text" id="bundlesizemetricInput" placeholder="Enter Bundle Size" class="hidden">
+        </div>
+    </div>
+
+    <table id="productTable">
+        <thead id="tableHeader">
+            <tr>
+                <th>Product</th>
+                <th>Mounting Need</th>
+            </tr>
+        </thead>
+        <tbody id="productTableBody">
+            <!-- Rows will be dynamically inserted here -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+let products = [];
+let currentMeasurementSystem = "Imperial";
+
+const csvUrl = 'https://www.hellermanntyton.us/docs/default-source/product-selector/self-affixing-ties-data-v11.csv';
+
+const filterDependencies = {
+    "Edge": ["Panel Thickness", "Bundle Size"], // Bundle Size moved to the end
+    "Hole": ["Mounting Hole Shape", "Mounting Hole Diameter", "Panel Thickness", "Bundle Size"], // Bundle Size moved to the end
+    "Stud": ["Mounting Hole Shape", "Stud Diameter", "Bundle Size"] // Bundle Size moved to the end
+};
+
+function loadCSVData() {
+    Papa.parse(csvUrl, {
+        download: true,
+        header: true,
+        complete: function(results) {
+            console.log('Parsed data:', results.data.slice(0, 5));
+            products = results.data.filter(p => p['Mounting Need'] !== "Adhere to Surface or Panel"); // Exclude "Adhere to Surface or Panel" products
+            initializeFilters();
+            populateTable(products);
+        },
+        error: function(error) {
+            console.error('Error parsing CSV:', error);
+        }
+    });
+}
+
+function initializeFilters() {
+    const mountingNeeds = [...new Set(products.map(p => p['Mounting Need']))].sort();
+    populateDropdown('mountingNeed', mountingNeeds);
+}
+
+function populateDropdown(id, options) {
+    const select = document.getElementById(id);
+    const currentValue = select.value;
+    select.innerHTML = `<option value="">${select.querySelector('option').textContent}</option>`;
+    options.forEach(option => {
+        if (option && option !== "Adhere to Surface or Panel") { // Exclude "Adhere to Surface or Panel" from dropdown
+            const opt = document.createElement('option');
+            opt.value = option;
+            opt.textContent = option;
+            select.appendChild(opt);
+        }
+    });
+    if (options.includes(currentValue)) {
+        select.value = currentValue;
+    } else {
+        select.value = "";
+    }
+}
+
+function filterProducts() {
+    const mountingNeed = document.getElementById('mountingNeed').value;
+    const mountingHoleShape = document.querySelector('input[name="mountingHoleShape"]:checked').value;
+    const additionalFilters = document.getElementById('additionalFilters');
+    const mountingHoleShapeFilters = document.getElementById('mountingHoleShapeFilters');
+
+    // Reset visibility of additional filters
+    document.querySelectorAll('#additionalFilters input').forEach(filter => filter.classList.add('hidden'));
+    document.querySelectorAll('#additionalFilters label').forEach(label => label.classList.add('hidden'));
+
+    // Show/hide Mounting Hole Shape radio buttons
+    if (mountingNeed === "Edge") {
+        mountingHoleShapeFilters.classList.add('hidden');
+    } else {
+        mountingHoleShapeFilters.classList.remove('hidden');
+    }
+
+    if (mountingNeed) {
+        additionalFilters.classList.remove('hidden');
+        const relevantFilters = filterDependencies[mountingNeed] || [];
+        relevantFilters.forEach(filterId => {
+            let filterKey = `${filterId.replace(/\s+/g, '').toLowerCase()}${currentMeasurementSystem.toLowerCase()}Input`;
+            let filterElement = document.getElementById(filterKey);
+            let filterLabel = document.getElementById(`${filterKey}Label`);
+
+            if (filterElement) {
+                filterElement.classList.remove('hidden');
+                if(filterLabel){
+                    filterLabel.classList.remove('hidden');
+                }
+            }
+        });
+    }
+
+    updateTableColumns(mountingNeed);
+    applyFilters();
+}
+
+function applyFilters() {
+    const mountingNeed = document.getElementById('mountingNeed').value;
+    const mountingHoleShape = document.querySelector('input[name="mountingHoleShape"]:checked').value;
+    let filteredProducts = products;
+
+    if (mountingNeed) {
+        filteredProducts = filteredProducts.filter(p => p['Mounting Need'] === mountingNeed);
+
+        // Filter by Mounting Hole Shape (only for Hole and Stud)
+        if (mountingNeed === "Hole" || mountingNeed === "Stud") {
+            filteredProducts = filteredProducts.filter(p => p['Mounting Hole Shape'] === mountingHoleShape);
+        }
+
+        const relevantFilters = filterDependencies[mountingNeed] || [];
+        relevantFilters.forEach(filterId => {
+            let filterKey = `${filterId.replace(/\s+/g, '').toLowerCase()}${currentMeasurementSystem.toLowerCase()}Input`;
+            let filterElement = document.getElementById(filterKey);
+
+            if (filterElement && !filterElement.classList.contains('hidden')) {
+                const inputValue = parseFloat(filterElement.value.replace(/[^0-9.]/g, '')); // Remove non-numeric characters
+                if (!isNaN(inputValue)) {
+                    filteredProducts = filteredProducts.filter(p => {
+                        const range = p[`${filterId} (${currentMeasurementSystem})`];
+                        console.log(`Range for ${p.Product}:`, range); // Debugging: Log the range
+                        if (range) {
+                            const [min, max] = range.split(/ - | to | – /).map(val => parseFloat(val.replace(/[^0-9.]/g, ''))); // Handle multiple delimiters and remove non-numeric characters
+                            if (!isNaN(min) && !isNaN(max)) {
+                                return inputValue >= min && inputValue <= max;
+                            }
+                        }
+                        return false;
+                    });
+                }
+            }
+        });
+    }
+
+    console.log('Filtered Products:', filteredProducts); // Debugging: Log the filtered products
+    populateTable(filteredProducts, mountingNeed);
+}
+
+function updateTableColumns(mountingNeed) {
+    const headerRow = document.querySelector('#tableHeader tr');
+    headerRow.innerHTML = '<th>Product</th>';
+
+    if (!mountingNeed) {
+        headerRow.innerHTML += '<th>Mounting Need</th>';
+    } else {
+        const relevantFilters = filterDependencies[mountingNeed] || [];
+        relevantFilters.forEach(filterName => {
+            if (filterName === "Mounting Hole Shape") {
+                headerRow.innerHTML += `<th>${filterName}</th>`;
+            } else {
+                headerRow.innerHTML += `<th>${filterName} (${currentMeasurementSystem})</th>`;
+            }
+        });
+    }
+}
+
+function populateTable(filteredProducts, mountingNeed) {
+    const tableBody = document.getElementById('productTableBody');
+    tableBody.innerHTML = '';
+
+    filteredProducts.forEach(product => {
+        let row = `
+            <td>
+                <img src="${product['Primary Image US Website']}" alt="${product.Product}" style="max-width: 100px; max-height: 100px;"><br>
+                ${product.Product}<br>
+                <a href="${product.URL}" target="_blank">${product.UNS}</a>
+            </td>`;
+
+        if (!mountingNeed) {
+            row += `<td>${product['Mounting Need']}</td>`;
+        } else {
+            const relevantFilters = filterDependencies[mountingNeed] || [];
+            relevantFilters.forEach(filterName => {
+                if (filterName === "Mounting Hole Shape") {
+                    row += `<td>${product[filterName] || 'N/A'}</td>`;
+                } else {
+                    row += `<td>${product[`${filterName} (${currentMeasurementSystem})`] || 'N/A'}</td>`;
+                }
+            });
+        }
+
+        tableBody.innerHTML += `<tr>${row}</tr>`;
+    });
+}
+
+function handleMeasurementSystemChange() {
+    currentMeasurementSystem = document.querySelector('input[name="measurementSystem"]:checked').value;
+    filterProducts();
+}
+
+window.onload = function() {
+    loadCSVData();
+    document.getElementById('mountingNeed').addEventListener('change', filterProducts);
+    document.querySelectorAll('input[name="measurementSystem"]').forEach(radio => {
+        radio.addEventListener('change', handleMeasurementSystemChange);
+    });
+    document.querySelectorAll('input[name="mountingHoleShape"]').forEach(radio => {
+        radio.addEventListener('change', filterProducts);
+    });
+    document.querySelectorAll('#additionalFilters input[type="text"]').forEach(input => {
+        input.addEventListener('input', filterProducts);
+    });
+};
+</script>
+
+</body>
+</html>
